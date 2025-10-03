@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="dark">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Mermaid Visual Editor</title>
+    <title>Mermaid Visual Editor - Dark</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://d3js.org/d3.v7.min.js"></script>
     <script type="module">
@@ -11,631 +11,188 @@
         window.mermaid = mermaid;
     </script>
     <style>
+        :root {
+            --color-bg: #111827; /* gray-900 */
+            --color-surface: #1f2937; /* gray-800 */
+            --color-border: #374151; /* gray-700 */
+            --color-text-primary: #f9fafb; /* gray-50 */
+            --color-text-secondary: #d1d5db; /* gray-300 */
+            --color-text-muted: #9ca3af; /* gray-400 */
+            --color-accent: #3b82f6; /* blue-500 */
+            --color-node-bg: #374151; /* gray-700 */
+            --color-node-stroke: #9ca3af; /* gray-400 */
+            --color-node-selected-stroke: #3b82f6; /* blue-500 */
+            --color-node-linking-stroke: #f59e0b; /* amber-500 */
+        }
         body { font-family: 'Inter', sans-serif; }
-        .link { stroke: #9ca3af; stroke-width: 2px; fill: none; }
-        .node rect { fill: white; stroke: #374151; stroke-width: 2px; rx: 8px; ry: 8px; transition: stroke 0.2s; }
-        .node.selected rect { stroke: #3b82f6; stroke-width: 3px; }
-        .node.linking-source rect { stroke: #f59e0b; stroke-width: 3px; }
-        .arrowhead { fill: #9ca3af; }
+        .link { stroke: var(--color-text-muted); stroke-width: 2px; fill: none; }
+        .link.selected { stroke: var(--color-accent); }
+        .arrowhead { fill: var(--color-text-muted); }
+        .link.selected .arrowhead { fill: var(--color-accent); }
+
+        .node rect {
+            fill: var(--color-node-bg);
+            stroke: var(--color-node-stroke);
+            stroke-width: 2px;
+            rx: 8px; ry: 8px;
+            transition: stroke 0.2s;
+        }
+        .node.selected rect { stroke: var(--color-node-selected-stroke); stroke-width: 3px; }
+        .node.linking-source rect { stroke: var(--color-node-linking-stroke); stroke-width: 3px; }
+        .node text { fill: var(--color-text-primary); }
+
+        .subgraph rect {
+            fill: rgba(31, 41, 55, 0.5); /* gray-800 with opacity */
+            stroke: var(--color-border);
+            stroke-dasharray: 5,5;
+            rx: 12px; ry: 12px;
+        }
+        .subgraph.selected rect {
+             stroke: var(--color-accent);
+             stroke-width: 2px;
+        }
+        .subgraph text { fill: var(--color-text-secondary); font-weight: bold; }
+
         .linking-cursor { cursor: crosshair; }
         #visual-editor-svg {
-            background-image: radial-gradient(#d1d5db 1px, transparent 0);
-            background-size: 20px 20px;
+            background-image: radial-gradient(var(--color-border) 1px, transparent 0);
+            background-size: 25px 25px;
+        }
+        .node-label, .link-label {
+            color: var(--color-text-primary);
+            background-color: var(--color-surface);
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        .selection-box {
+            fill: rgba(59, 130, 246, 0.2); /* blue-500 with opacity */
+            stroke: var(--color-accent);
+            stroke-width: 1px;
+            stroke-dasharray: 4, 4;
         }
     </style>
 </head>
-<body class="bg-gray-100 text-gray-800">
+<body class="bg-gray-900 text-gray-50">
 
     <div class="flex flex-col h-screen">
         <!-- Header -->
-        <header class="bg-white shadow-md p-4 z-10">
-            <h1 class="text-2xl font-bold text-gray-900">Mermaid Visual Editor</h1>
-            <p class="text-sm text-gray-600">Click "Add Node" to start. To connect, click "Create Link", then click the source node, and then the target node.</p>
+        <header class="bg-gray-800 shadow-lg p-4 z-10">
+            <h1 class="text-2xl font-bold text-white">Mermaid Visual Editor</h1>
+            <p class="text-sm text-gray-400">Click 'Add Node' (Ctrl+N) to start. To connect, click 'Create Links' (Ctrl+L), then single-click a source and a target node. Double-click items to edit their text.</p>
         </header>
 
         <!-- Main Content -->
         <div class="flex flex-grow overflow-hidden">
             <!-- Left Panel (Controls & Code) -->
-            <div class="w-1/3 flex flex-col bg-white p-4 border-r border-gray-200 overflow-y-auto">
+            <div class="w-1/3 flex flex-col bg-gray-800 p-4 border-r border-gray-700 overflow-y-auto">
                 <!-- Controls -->
                 <div class="mb-6">
-                    <h2 class="text-lg font-semibold mb-3 border-b pb-2">Controls</h2>
-                    <div class="flex space-x-2">
-                        <button id="add-node-btn" class="w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-lg transition-colors">
-                            Add Node
-                        </button>
-                        <button id="create-link-btn" class="w-full bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded-lg transition-colors">
-                            Create Link
-                        </button>
+                    <h2 class="text-lg font-semibold mb-3 border-b border-gray-600 pb-2 text-gray-200">Controls</h2>
+                    <div class="grid grid-cols-2 gap-2">
+                        <div class="flex flex-col items-center">
+                            <button id="add-node-btn" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg transition-colors">
+                                Add Node
+                            </button>
+                            <span class="text-xs text-gray-400 mt-1">Ctrl + N</span>
+                        </div>
+                        <div class="flex flex-col items-center">
+                             <button id="create-link-btn" class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg transition-colors">
+                                Create Links
+                            </button>
+                            <span class="text-xs text-gray-400 mt-1">Ctrl + L</span>
+                        </div>
                     </div>
                     <div class="mt-2">
-                        <button id="add-subgraph-btn" class="w-full bg-purple-500 hover:bg-purple-600 text-white font-bold py-2 px-4 rounded-lg transition-colors">
+                        <button id="add-subgraph-btn" class="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded-lg transition-colors">
                             Add Subgraph
                         </button>
                     </div>
-                </div>
-
-                <!-- Node Editor (hidden by default) -->
-                <div id="node-editor" class="mb-6 hidden">
-                    <h2 class="text-lg font-semibold mb-3 border-b pb-2">Edit Selected Node</h2>
-                    <div class="space-y-3">
-                        <div>
-                            <label for="node-text" class="block text-sm font-medium text-gray-700">Node Text</label>
-                            <input type="text" id="node-text" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
-                        </div>
-                        <div>
-                            <label for="node-id" class="block text-sm font-medium text-gray-700">Node ID (Unique)</label>
-                            <input type="text" id="node-id" readonly class="mt-1 block w-full rounded-md border-gray-300 shadow-sm bg-gray-100 sm:text-sm">
-                        </div>
-                        <div>
-                            <label for="node-subgraph" class="block text-sm font-medium text-gray-700">Subgraph</label>
-                            <select id="node-subgraph" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
-                                <!-- Options will be populated by JS -->
-                            </select>
-                        </div>
-                    </div>
-                    <div class="mt-4">
-                         <button id="delete-node-btn" class="w-full bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded-lg transition-colors">
-                            Delete Node
-                        </button>
+                     <div class="text-center mt-2">
+                        <span class="text-xs text-gray-400">Use Delete/Backspace to remove selected items.</span>
                     </div>
                 </div>
 
-                <!-- Link Editor (hidden by default) -->
-                <div id="link-editor" class="mb-6 hidden">
-                    <h2 class="text-lg font-semibold mb-3 border-b pb-2">Edit Selected Link</h2>
-                    <div class="space-y-3">
-                        <div>
-                            <label for="link-label" class="block text-sm font-medium text-gray-700">Link Label</label>
-                            <input type="text" id="link-label" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
+                <!-- Editor Panels Container -->
+                <div id="editor-panels">
+                    <!-- Node Editor (hidden by default) -->
+                    <div id="node-editor" class="mb-6 hidden">
+                        <h2 class="text-lg font-semibold mb-3 border-b border-gray-600 pb-2 text-gray-200">Edit Node</h2>
+                        <div class="space-y-3">
+                            <div>
+                                <label for="node-text" class="block text-sm font-medium text-gray-300">Node Text</label>
+                                <input type="text" id="node-text" class="mt-1 block w-full rounded-md bg-gray-700 border-gray-600 text-white shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm">
+                            </div>
+                            <div>
+                                <label for="node-id" class="block text-sm font-medium text-gray-300">Node ID</label>
+                                <input type="text" id="node-id" readonly class="mt-1 block w-full rounded-md border-gray-600 shadow-sm bg-gray-600 text-gray-400 sm:text-sm">
+                            </div>
+                            <div>
+                                <label for="node-subgraph" class="block text-sm font-medium text-gray-300">Subgraph</label>
+                                <select id="node-subgraph" class="mt-1 block w-full rounded-md bg-gray-700 border-gray-600 text-white shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"></select>
+                            </div>
+                        </div>
+                        <div class="mt-4">
+                            <button id="delete-node-btn" class="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-lg transition-colors">Delete Node</button>
                         </div>
                     </div>
-                    <div class="mt-4">
-                         <button id="delete-link-btn" class="w-full bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded-lg transition-colors">
-                            Delete Link
-                        </button>
-                    </div>
-                </div>
 
-                <!-- Subgraph Editor (hidden by default) -->
-                <div id="subgraph-editor" class="mb-6 hidden">
-                    <h2 class="text-lg font-semibold mb-3 border-b pb-2">Edit Selected Subgraph</h2>
-                    <div class="space-y-3">
-                        <div>
-                            <label for="subgraph-title" class="block text-sm font-medium text-gray-700">Subgraph Title</label>
-                            <input type="text" id="subgraph-title" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
+                    <!-- Link Editor (hidden by default) -->
+                    <div id="link-editor" class="mb-6 hidden">
+                         <h2 class="text-lg font-semibold mb-3 border-b border-gray-600 pb-2 text-gray-200">Edit Link</h2>
+                        <div class="space-y-3">
+                            <div>
+                                <label for="link-label" class="block text-sm font-medium text-gray-300">Link Label</label>
+                                <input type="text" id="link-label" class="mt-1 block w-full rounded-md bg-gray-700 border-gray-600 text-white shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm">
+                            </div>
                         </div>
-                        <div>
-                            <label for="subgraph-id" class="block text-sm font-medium text-gray-700">Subgraph ID (Unique)</label>
-                            <input type="text" id="subgraph-id" readonly class="mt-1 block w-full rounded-md border-gray-300 shadow-sm bg-gray-100 sm:text-sm">
+                        <div class="mt-4">
+                            <button id="delete-link-btn" class="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-lg transition-colors">Delete Link</button>
                         </div>
                     </div>
-                    <div class="mt-4">
-                        <button id="delete-subgraph-btn" class="w-full bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded-lg transition-colors">
-                            Delete Subgraph
-                        </button>
+
+                    <!-- Subgraph Editor (hidden by default) -->
+                    <div id="subgraph-editor" class="mb-6 hidden">
+                        <h2 class="text-lg font-semibold mb-3 border-b border-gray-600 pb-2 text-gray-200">Edit Subgraph</h2>
+                        <div class="space-y-3">
+                            <div>
+                                <label for="subgraph-title" class="block text-sm font-medium text-gray-300">Subgraph Title</label>
+                                <input type="text" id="subgraph-title" class="mt-1 block w-full rounded-md bg-gray-700 border-gray-600 text-white shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm">
+                            </div>
+                             <div>
+                                <label for="subgraph-id" class="block text-sm font-medium text-gray-300">Subgraph ID</label>
+                                <input type="text" id="subgraph-id" readonly class="mt-1 block w-full rounded-md border-gray-600 shadow-sm bg-gray-600 text-gray-400 sm:text-sm">
+                            </div>
+                        </div>
+                        <div class="mt-4">
+                            <button id="delete-subgraph-btn" class="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-lg transition-colors">Delete Subgraph</button>
+                        </div>
                     </div>
                 </div>
 
                 <!-- Comments -->
                 <div class="mb-6">
-                    <h2 class="text-lg font-semibold mb-3 border-b pb-2">Comments</h2>
-                    <textarea id="comments-input" class="w-full h-24 p-2 border border-gray-300 rounded-md bg-white font-sans text-sm" placeholder="Add comments here..."></textarea>
+                    <h2 class="text-lg font-semibold mb-3 border-b border-gray-600 pb-2 text-gray-200">Comments</h2>
+                    <textarea id="comments-input" class="w-full h-24 p-2 border border-gray-600 rounded-md bg-gray-700 text-white font-sans text-sm" placeholder="Add comments here..."></textarea>
                 </div>
 
                 <!-- Mermaid Code Output -->
                 <div class="flex-grow flex flex-col">
-                    <h2 class="text-lg font-semibold mb-3 border-b pb-2">Generated Mermaid Code</h2>
+                    <h2 class="text-lg font-semibold mb-3 border-b border-gray-600 pb-2 text-gray-200">Generated Mermaid Code</h2>
                     <div class="relative flex-grow">
-                        <textarea id="mermaid-code" class="w-full h-full p-2 border border-gray-300 rounded-md bg-gray-50 font-mono text-sm resize-none" readonly></textarea>
-                        <button id="copy-code-btn" class="absolute top-2 right-2 bg-gray-200 hover:bg-gray-300 text-gray-700 p-1.5 rounded-md text-xs">Copy</button>
+                        <textarea id="mermaid-code" class="w-full h-full p-2 border border-gray-600 rounded-md bg-gray-900 font-mono text-sm text-gray-300 resize-none" readonly></textarea>
+                        <button id="copy-code-btn" class="absolute top-2 right-2 bg-gray-600 hover:bg-gray-500 text-gray-200 p-1.5 rounded-md text-xs">Copy</button>
                     </div>
                 </div>
             </div>
 
             <!-- Right Panel (Visual Editor) -->
-            <main class="w-2/3 flex-grow bg-gray-50">
+            <main class="w-2/3 flex-grow bg-gray-900">
                 <svg id="visual-editor-svg" class="w-full h-full"></svg>
             </main>
         </div>
     </div>
 
-    <script type="module">
-        document.addEventListener('DOMContentLoaded', () => {
-        // --- State Management ---
-        let nodes = [
-            { id: 'A', text: 'Start Here', x: 150, y: 100, width: 120, height: 60 },
-            { id: 'B', text: 'Go Left or Right?', x: 150, y: 250, width: 150, height: 60 },
-        ];
-        let links = [
-            { source: 'A', target: 'B', label: 'Connection' }
-        ];
-        let subgraphs = [];
-        let selectedNode = null;
-        let selectedLink = null;
-        let selectedSubgraph = null;
-        let isLinking = false;
-        let linkStartNode = null;
-
-        // --- D3 Setup ---
-        const svg = d3.select("#visual-editor-svg");
-        const width = svg.node().getBoundingClientRect().width;
-        const height = svg.node().getBoundingClientRect().height;
-
-        const subgraphGroup = svg.append("g").attr("class", "subgraphs");
-        const linkGroup = svg.append("g").attr("class", "links");
-        const nodeGroup = svg.append("g").attr("class", "nodes");
-
-        svg.append("defs").append("marker")
-            .attr("id", "arrowhead")
-            .attr("viewBox", "-0 -5 10 10")
-            .attr("refX", 19)
-            .attr("refY", 0)
-            .attr("orient", "auto")
-            .attr("markerWidth", 8)
-            .attr("markerHeight", 8)
-            .attr("xoverflow", "visible")
-            .append("svg:path")
-            .attr("d", "M 0,-5 L 10 ,0 L 0,5")
-            .attr("class", "arrowhead");
-
-        // --- Core Functions ---
-        function updateAll() {
-            renderD3();
-            updateMermaidCode();
-        }
-
-        function generateUniqueId() {
-            return `node_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
-        }
-
-        function updateMermaidCode() {
-            const codeTextArea = document.getElementById('mermaid-code');
-            let code = "";
-
-            // Add comments
-            const comments = document.getElementById('comments-input').value.trim();
-            if (comments) {
-                comments.split('\n').forEach(line => {
-                    code += `%% ${line}\n`;
-                });
-            }
-
-            code += "graph TD\n";
-
-            const nodesBySubgraph = nodes.reduce((acc, node) => {
-                const subgraphId = node.subgraphId || 'root';
-                if (!acc[subgraphId]) {
-                    acc[subgraphId] = [];
-                }
-                acc[subgraphId].push(node);
-                return acc;
-            }, {});
-
-            // Render subgraphs
-            subgraphs.forEach(sg => {
-                code += `    subgraph ${sg.id} ["${sg.title}"]\n`;
-                const sgNodes = nodesBySubgraph[sg.id] || [];
-                sgNodes.forEach(node => {
-                    const nodeText = node.text.replace(/"/g, '#quot;');
-                    code += `        ${node.id}["${nodeText}"]\n`;
-                });
-                code += `    end\n`;
-            });
-
-            // Render nodes not in any subgraph
-            const orphanNodes = nodesBySubgraph['root'] || [];
-            orphanNodes.forEach(node => {
-                const nodeText = node.text.replace(/"/g, '#quot;');
-                code += `    ${node.id}["${nodeText}"]\n`;
-            });
-
-            // Render links
-            links.forEach(link => {
-                if (link.label) {
-                    const linkText = link.label.replace(/"/g, '#quot;');
-                    code += `    ${link.source} -- "${linkText}" --> ${link.target}\n`;
-                } else {
-                    code += `    ${link.source} --> ${link.target}\n`;
-                }
-            });
-            codeTextArea.value = code;
-        }
-
-        // --- D3 Rendering ---
-        function updateLinkPaths() {
-            const linkSelection = linkGroup.selectAll("path.link")
-                .data(links, d => `${d.source}-${d.target}`)
-                .join("path")
-                .attr("class", d => `link ${selectedLink === d ? 'selected' : ''}`)
-                .attr("marker-end", "url(#arrowhead)")
-                .on('click', (event, d) => {
-                    event.stopPropagation();
-                    selectLink(d);
-                });
-
-            linkSelection.attr("d", d => {
-                const sourceNode = nodes.find(n => n.id === d.source);
-                const targetNode = nodes.find(n => n.id === d.target);
-                if (!sourceNode || !targetNode) return "";
-
-                const dx = targetNode.x - sourceNode.x;
-                const dy = targetNode.y - sourceNode.y;
-                const gamma = Math.atan2(dy, dx);
-
-                const getIntersection = (node, angle) => {
-                    const w = node.width / 2;
-                    const h = node.height / 2;
-                    const tan_gamma = Math.tan(angle);
-                    let x, y;
-                    if (Math.abs(h * Math.cos(angle)) > Math.abs(w * Math.sin(angle))) {
-                        x = w * (Math.cos(angle) > 0 ? 1 : -1) + node.x;
-                        y = w * (Math.cos(angle) > 0 ? 1 : -1) * tan_gamma + node.y;
-                    } else {
-                        y = h * (Math.sin(angle) > 0 ? 1 : -1) + node.y;
-                        x = h * (Math.sin(angle) > 0 ? 1 : -1) / tan_gamma + node.x;
-                    }
-                    return { x, y };
-                };
-
-                const sourcePoint = getIntersection(sourceNode, gamma);
-                const targetPoint = getIntersection(targetNode, gamma + Math.PI);
-
-                return `M${sourcePoint.x},${sourcePoint.y}L${targetPoint.x},${targetPoint.y}`;
-            });
-        }
-
-        function updateLinkLabels() {
-             linkGroup.selectAll("text.link-label")
-                .data(links, d => `${d.source}-${d.target}`)
-                .join("text")
-                .attr("class", "link-label")
-                .attr("text-anchor", "middle")
-                .attr("dy", "-4")
-                .text(d => d.label)
-                .attr("x", d => {
-                    const sourceNode = nodes.find(n => n.id === d.source);
-                    const targetNode = nodes.find(n => n.id === d.target);
-                    if (!sourceNode || !targetNode) return 0;
-                    return (sourceNode.x + targetNode.x) / 2;
-                })
-                .attr("y", d => {
-                    const sourceNode = nodes.find(n => n.id === d.source);
-                    const targetNode = nodes.find(n => n.id === d.target);
-                    if (!sourceNode || !targetNode) return 0;
-                    return (sourceNode.y + targetNode.y) / 2;
-                });
-        }
-
-        function updateSubgraphRects() {
-            const subgraphSelection = subgraphGroup.selectAll("g.subgraph").data(subgraphs, d => d.id);
-            subgraphSelection.each(function(d) {
-                const childNodes = nodes.filter(n => n.subgraphId === d.id);
-                if (childNodes.length === 0) {
-                    d3.select(this).select('rect').attr('width', 200).attr('height', 150);
-                     d3.select(this).attr('transform', `translate(10, 10)`);
-                    return;
-                };
-
-                let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-                childNodes.forEach(n => {
-                    minX = Math.min(minX, n.x - n.width / 2);
-                    minY = Math.min(minY, n.y - n.height / 2);
-                    maxX = Math.max(maxX, n.x + n.width / 2);
-                    maxY = Math.max(maxY, n.y + n.height / 2);
-                });
-
-                const padding = 20;
-                const titleHeight = 30;
-                const rectX = minX - padding;
-                const rectY = minY - padding - titleHeight;
-                const rectWidth = (maxX - minX) + (2 * padding);
-                const rectHeight = (maxY - minY) + (2 * padding) + titleHeight;
-
-                d3.select(this).attr('transform', `translate(${rectX}, ${rectY})`);
-                d3.select(this).select('rect').attr('width', rectWidth).attr('height', rectHeight);
-                d3.select(this).select('text').attr('x', rectWidth / 2).attr('y', titleHeight / 2);
-            });
-        }
-
-        function renderD3() {
-            // Render subgraphs first so they are in the background
-            const subgraphSelection = subgraphGroup.selectAll("g.subgraph").data(subgraphs, d => d.id);
-            subgraphSelection.exit().remove();
-
-            const subgraphEnter = subgraphSelection.enter().append("g")
-                .attr("class", "subgraph")
-                .on('click', (event, d) => {
-                    event.stopPropagation();
-                    selectSubgraph(d);
-                });
-            subgraphEnter.append("rect");
-            subgraphEnter.append("text").attr("text-anchor", "middle");
-
-            subgraphEnter.merge(subgraphSelection)
-                .attr("class", d => `subgraph ${selectedSubgraph === d ? 'selected' : ''}`)
-                .select("text").text(d => d.title);
-
-            // Render nodes
-            const nodeSelection = nodeGroup.selectAll("g.node").data(nodes, d => d.id);
-            nodeSelection.exit().remove();
-
-            const nodeEnter = nodeSelection.enter().append("g").attr("class", "node");
-            nodeEnter.append("rect");
-            nodeEnter.append("text").attr("dy", "0.35em").attr("text-anchor", "middle");
-
-            const allNodes = nodeEnter.merge(nodeSelection);
-
-            allNodes
-                .attr("transform", d => `translate(${d.x - d.width/2},${d.y - d.height/2})`)
-                .attr("class", d => {
-                    let classes = 'node';
-                    if (d === selectedNode) classes += ' selected';
-                    if (linkStartNode && d.id === linkStartNode.id) classes += ' linking-source';
-                    return classes;
-                });
-
-            allNodes.select("rect")
-                .attr("width", d => d.width)
-                .attr("height", d => d.height);
-
-            allNodes.select("text")
-                .attr("x", d => d.width / 2)
-                .attr("y", d => d.height / 2)
-                .text(d => d.text);
-
-            allNodes
-                .on("click", (event, d) => {
-                    event.stopPropagation();
-                    if (isLinking) {
-                        handleLinking(d);
-                    } else {
-                        selectNode(d);
-                    }
-                })
-                .call(d3.drag()
-                    .on("start", dragstarted)
-                    .on("drag", dragged)
-                    .on("end", dragended));
-
-            updateLinkPaths();
-            updateLinkLabels();
-            updateSubgraphRects();
-        }
-
-        // --- Drag Handling ---
-        function dragstarted(event, d) {
-            d3.select(this).raise().classed("active", true);
-        }
-
-        function dragged(event, d) {
-            d.x = event.x;
-            d.y = event.y;
-            d3.select(this).attr("transform", `translate(${d.x - d.width/2},${d.y - d.height/2})`);
-            updateLinkPaths();
-            updateLinkLabels();
-            if (d.subgraphId) {
-                updateSubgraphRects();
-            }
-        }
-
-        function dragended(event, d) {
-            d3.select(this).classed("active", false);
-            updateAll();
-        }
-
-        // --- Data Generation ---
-        function generateUniqueId(prefix = 'node') {
-            return `${prefix}_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
-        }
-
-        // --- Selection & Management ---
-        function selectNode(node) {
-            selectedNode = node;
-            selectedLink = null;
-            selectedSubgraph = null;
-
-            document.getElementById('node-editor').classList.remove('hidden');
-            document.getElementById('link-editor').classList.add('hidden');
-            document.getElementById('subgraph-editor').classList.add('hidden');
-
-            document.getElementById('node-text').value = node.text;
-            document.getElementById('node-id').value = node.id;
-
-            // Populate subgraph dropdown
-            const subgraphSelect = document.getElementById('node-subgraph');
-            subgraphSelect.innerHTML = '<option value="">None</option>'; // Clear existing
-            subgraphs.forEach(sg => {
-                const option = document.createElement('option');
-                option.value = sg.id;
-                option.textContent = sg.title;
-                subgraphSelect.appendChild(option);
-            });
-            subgraphSelect.value = node.subgraphId || '';
-
-            updateAll();
-        }
-
-        function selectLink(link) {
-            selectedLink = link;
-            selectedNode = null;
-            selectedSubgraph = null;
-            document.getElementById('link-editor').classList.remove('hidden');
-            document.getElementById('node-editor').classList.add('hidden');
-            document.getElementById('subgraph-editor').classList.add('hidden');
-            document.getElementById('link-label').value = link.label;
-            updateAll();
-        }
-
-        function selectSubgraph(subgraph) {
-            selectedSubgraph = subgraph;
-            selectedNode = null;
-            selectedLink = null;
-            document.getElementById('subgraph-editor').classList.remove('hidden');
-            document.getElementById('node-editor').classList.add('hidden');
-            document.getElementById('link-editor').classList.add('hidden');
-            document.getElementById('subgraph-title').value = subgraph.title;
-            document.getElementById('subgraph-id').value = subgraph.id;
-            updateAll();
-        }
-
-        function deselectAll() {
-            selectedNode = null;
-            selectedLink = null;
-            selectedSubgraph = null;
-            document.getElementById('node-editor').classList.add('hidden');
-            document.getElementById('link-editor').classList.add('hidden');
-            document.getElementById('subgraph-editor').classList.add('hidden');
-
-            isLinking = false;
-            linkStartNode = null;
-            document.getElementById('create-link-btn').textContent = 'Create Link';
-            document.getElementById('create-link-btn').classList.remove('bg-yellow-500', 'hover:bg-yellow-600');
-            document.getElementById('create-link-btn').classList.add('bg-green-500', 'hover:bg-green-600');
-            svg.classed('linking-cursor', false);
-            updateAll();
-        }
-
-        function handleLinking(targetNode) {
-            if (!linkStartNode) {
-                linkStartNode = targetNode;
-                document.getElementById('create-link-btn').textContent = '...Select Target Node';
-                updateAll();
-            } else {
-                if (linkStartNode.id !== targetNode.id) {
-                    const linkExists = links.some(l => (l.source === linkStartNode.id && l.target === targetNode.id));
-                    if (!linkExists) {
-                        links.push({ source: linkStartNode.id, target: targetNode.id, label: '' });
-                    }
-                }
-                deselectAll();
-            }
-        }
-
-        // --- Event Listeners ---
-        document.getElementById('add-node-btn').addEventListener('click', () => {
-            const newNode = {
-                id: generateUniqueId('node'),
-                text: 'New Node',
-                x: Math.random() * (width - 200) + 100,
-                y: Math.random() * (height - 100) + 50,
-                width: 120,
-                height: 60,
-                subgraphId: null
-            };
-            nodes.push(newNode);
-            selectNode(newNode);
-        });
-
-        document.getElementById('add-subgraph-btn').addEventListener('click', () => {
-            const newSubgraph = {
-                id: generateUniqueId('sg'),
-                title: 'New Subgraph'
-            };
-            subgraphs.push(newSubgraph);
-            selectSubgraph(newSubgraph);
-        });
-
-        document.getElementById('create-link-btn').addEventListener('click', () => {
-            isLinking = !isLinking;
-            if (isLinking) {
-                deselectAll();
-                isLinking = true; // deselectAll sets it to false
-                linkStartNode = null;
-                document.getElementById('create-link-btn').textContent = 'Cancel Linking';
-                document.getElementById('create-link-btn').classList.remove('bg-green-500', 'hover:bg-green-600');
-                document.getElementById('create-link-btn').classList.add('bg-yellow-500', 'hover:bg-yellow-600');
-                svg.classed('linking-cursor', true);
-                updateAll();
-            } else {
-                deselectAll();
-            }
-        });
-
-        document.getElementById('node-text').addEventListener('input', (e) => {
-            if (selectedNode) {
-                selectedNode.text = e.target.value;
-                updateAll();
-            }
-        });
-
-        document.getElementById('node-subgraph').addEventListener('change', (e) => {
-            if (selectedNode) {
-                selectedNode.subgraphId = e.target.value || null;
-                updateAll();
-            }
-        });
-
-        document.getElementById('delete-node-btn').addEventListener('click', () => {
-            if (selectedNode) {
-                nodes = nodes.filter(n => n.id !== selectedNode.id);
-                links = links.filter(l => l.source !== selectedNode.id && l.target !== selectedNode.id);
-                deselectAll();
-            }
-        });
-
-        document.getElementById('link-label').addEventListener('input', (e) => {
-            if (selectedLink) {
-                selectedLink.label = e.target.value;
-                updateAll();
-            }
-        });
-
-        document.getElementById('delete-link-btn').addEventListener('click', () => {
-            if (selectedLink) {
-                links = links.filter(l => l !== selectedLink);
-                deselectAll();
-            }
-        });
-
-        document.getElementById('subgraph-title').addEventListener('input', (e) => {
-            if (selectedSubgraph) {
-                selectedSubgraph.title = e.target.value;
-                updateAll();
-            }
-        });
-
-        document.getElementById('delete-subgraph-btn').addEventListener('click', () => {
-            if (selectedSubgraph) {
-                // Remove subgraph and unset subgraphId on its nodes
-                nodes.forEach(n => {
-                    if (n.subgraphId === selectedSubgraph.id) {
-                        n.subgraphId = null;
-                    }
-                });
-                subgraphs = subgraphs.filter(sg => sg.id !== selectedSubgraph.id);
-                deselectAll();
-            }
-        });
-
-        document.getElementById('comments-input').addEventListener('input', () => {
-            updateAll();
-        });
-
-        document.getElementById('copy-code-btn').addEventListener('click', () => {
-            const codeTextArea = document.getElementById('mermaid-code');
-            codeTextArea.select();
-            document.execCommand('copy');
-        });
-
-        svg.on('click', () => {
-            if (!isLinking) {
-                deselectAll();
-            }
-        });
-
-        // --- Initial Load ---
-        updateAll();
-
-        // Expose functions and data for testing
-        window.selectNode = selectNode;
-        window.selectLink = selectLink;
-        window.deselectAll = deselectAll;
-        window.nodes = nodes;
-        window.links = links;
-        window.subgraphs = subgraphs;
-        window.updateAll = updateAll;
-        });
-    </script>
+    <script type="module" src="js/main.js"></script>
 </body>
 </html>
