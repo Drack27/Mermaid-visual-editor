@@ -32,24 +32,44 @@ export function initializeD3() {
         .attr("class", "arrowhead");
 }
 
+// Bugfix: Links were hard to click because the visible path is very thin.
+// Solution: Create a wider, invisible "hit area" path for each link and attach the
+// event listeners to it. Both paths are wrapped in a <g> container.
 function updateLinkPaths() {
-    const linkSelection = linkGroup.selectAll("path.link")
-        .data(state.links, d => `${d.source}-${d.target}`)
-        .join("path")
-        .attr("class", d => `link ${state.selectedLinks.has(d) ? 'selected' : ''}`)
-        .attr("marker-end", "url(#arrowhead)")
+    const linkContainerSelection = linkGroup.selectAll("g.link-container")
+        .data(state.links, d => `${d.source}-${d.target}`);
+
+    linkContainerSelection.exit().remove();
+
+    const linkContainerEnter = linkContainerSelection.enter().append("g")
+        .attr("class", "link-container");
+
+    // The visible path
+    linkContainerEnter.append("path")
+        .attr("class", "link")
+        .attr("marker-end", "url(#arrowhead)");
+
+    // The invisible, wider hit area
+    linkContainerEnter.append("path")
+        .attr("class", "link-hit-area")
         .on('click', (event, d) => {
             event.stopPropagation();
             selectLink(d, event.ctrlKey);
         })
         .on('dblclick', function(event, d) {
-             event.stopPropagation();
-             // Find the associated label to edit, as dblclicking the path is less intuitive
-             const label = linkGroup.selectAll("text.link-label").filter(ld => ld === d).node();
-             handleDoubleClick(d, 'link', label || this);
+            event.stopPropagation();
+            const label = linkGroup.selectAll("text.link-label").filter(ld => ld === d).node();
+            handleDoubleClick(d, 'link', label || this);
         });
 
-    linkSelection.attr("d", d => {
+
+    const allLinkContainers = linkContainerEnter.merge(linkContainerSelection);
+
+    // Update the visible path class
+    allLinkContainers.select("path.link")
+        .attr("class", d => `link ${state.selectedLinks.has(d) ? 'selected' : ''}`);
+
+    const pathGenerator = d => {
         const sourceNode = state.nodes.find(n => n.id === d.source);
         const targetNode = state.nodes.find(n => n.id === d.target);
         if (!sourceNode || !targetNode) return "";
@@ -77,7 +97,11 @@ function updateLinkPaths() {
         const targetPoint = getIntersection(targetNode, gamma + Math.PI);
 
         return `M${sourcePoint.x},${sourcePoint.y}L${targetPoint.x},${targetPoint.y}`;
-    });
+    };
+
+    // Apply the path to both the visible link and the hit area
+    allLinkContainers.selectAll("path")
+        .attr("d", pathGenerator);
 }
 
 function updateLinkLabels() {
@@ -165,7 +189,11 @@ export function renderD3() {
         .style('height', '100%')
         .style('padding', '5px')
         .style('box-sizing', 'border-box')
-        .style('line-height', '1.2');
+        .style('line-height', '1.2')
+        // Bugfix: The foreignObject for text was capturing pointer events,
+        // preventing the node's <g> element from receiving the click.
+        // This ensures the click passes through to the intended target.
+        .style('pointer-events', 'none');
 
     const allNodes = nodeEnter.merge(nodeSelection);
 
@@ -372,32 +400,26 @@ function dragended(event, d) {
 }
 
 // --- Subgraph Drag Handling ---
-let dragStartPositions = new Map();
-
+// Bugfix: Original drag logic only moved child nodes, not the subgraph container itself.
+// It also used a confusing and unnecessary `dragStartPositions` map.
+// The new logic is simpler: on drag, update the position of the subgraph and all its
+// children by the same delta (dx, dy).
 function subgraphDragStarted(event, d) {
     d3.select(this).raise().classed("active", true);
-    dragStartPositions.clear();
-    const childNodes = state.nodes.filter(n => n.subgraphId === d.id);
-    childNodes.forEach(node => {
-        dragStartPositions.set(node.id, { x: node.x, y: node.y });
-    });
 }
 
 function subgraphDragged(event, d) {
     const { dx, dy } = event;
+
+    // Move the subgraph itself
+    d.x += dx;
+    d.y += dy;
+
+    // Move its child nodes
     const childNodes = state.nodes.filter(n => n.subgraphId === d.id);
-
     childNodes.forEach(node => {
-        const startPos = dragStartPositions.get(node.id);
-        if (startPos) {
-            node.x += dx;
-            node.y += dy;
-        }
-    });
-
-    // To ensure positions are updated correctly for the next drag event
-    childNodes.forEach(node => {
-        dragStartPositions.set(node.id, { x: node.x, y: node.y });
+        node.x += dx;
+        node.y += dy;
     });
 
     updateAll(); // Re-render everything to show movement
@@ -405,6 +427,5 @@ function subgraphDragged(event, d) {
 
 function subgraphDragEnded(event, d) {
     d3.select(this).classed("active", false);
-    dragStartPositions.clear();
-    updateAll();
+    updateAll(); // Final update to ensure state is saved
 }

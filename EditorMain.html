@@ -27,6 +27,15 @@
         body { font-family: 'Inter', sans-serif; }
         .link { stroke: var(--color-text-muted); stroke-width: 2px; fill: none; }
         .link.selected { stroke: var(--color-accent); }
+
+        /* A wider, invisible path used to make clicking links easier */
+        .link-hit-area {
+            stroke: transparent;
+            stroke-width: 15px; /* The "hit" area */
+            fill: none;
+            cursor: pointer;
+        }
+
         .arrowhead { fill: var(--color-text-muted); }
         .link.selected .arrowhead { fill: var(--color-accent); }
 

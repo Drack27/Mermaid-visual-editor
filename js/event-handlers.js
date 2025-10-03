@@ -61,7 +61,9 @@ export function initializeEventListeners() {
 
     // Handle deselection on simple click on the background
     svg.on('click', (event) => {
+        console.log(`SVG clicked. Target: ${event.target.tagName}`);
         if (event.target === svg.node() && !state.isLinking) {
+            console.log('Deselecting all due to SVG background click.');
             deselectAll();
         }
     });
@@ -142,8 +144,19 @@ export function initializeEventListeners() {
         })
     );
 
+    // Bugfix: Prevent node/link/subgraph deletion when the user is editing text in an input field.
+    // The previous implementation had a global listener that would fire on 'Backspace',
+    // even when the user's intent was to edit text.
     window.addEventListener('keydown', (e) => {
-        if (e.key === 'Delete' || e.key === 'Backspace') {
+        const activeElement = document.activeElement;
+        const isEditing = activeElement && (
+            activeElement.tagName === 'INPUT' ||
+            activeElement.tagName === 'TEXTAREA' ||
+            activeElement.isContentEditable
+        );
+
+        if ((e.key === 'Delete' || e.key === 'Backspace') && !isEditing) {
+            e.preventDefault(); // Prevents browser's back navigation on backspace
             deleteSelected();
         }
         if (e.ctrlKey && e.key === 'n') {
@@ -208,40 +221,53 @@ function toggleLinkingMode() {
 }
 
 
+// Bugfix: When selecting an element without holding Ctrl, previous selections were not cleared.
+// The original `deselectAll(true)` call was incorrect. The fix is to manually clear
+// all selections when `multiSelect` is false.
 export function selectNode(node, multiSelect = false) {
     if (!multiSelect) {
-        deselectAll(true);
+        state.selectedNodes.clear();
+        state.selectedLinks.clear();
     }
 
+    // Toggle selection for the clicked node.
     if (state.selectedNodes.has(node)) {
         state.selectedNodes.delete(node);
     } else {
         state.selectedNodes.add(node);
     }
 
+    // Selecting a node should always deselect any active subgraph.
     state.setSelectedSubgraph(null);
     updateEditorPanels();
     renderD3();
 }
 
+// Bugfix: Consistent selection logic with selectNode.
 export function selectLink(link, multiSelect = false) {
     if (!multiSelect) {
-        deselectAll(true);
+        state.selectedNodes.clear();
+        state.selectedLinks.clear();
     }
 
+    // Toggle selection for the clicked link.
     if (state.selectedLinks.has(link)) {
         state.selectedLinks.delete(link);
     } else {
         state.selectedLinks.add(link);
     }
 
+    // Selecting a link should always deselect any active subgraph.
     state.setSelectedSubgraph(null);
     updateEditorPanels();
     renderD3();
 }
 
+// Bugfix: Consistent selection logic.
 export function selectSubgraph(subgraph) {
-    deselectAll(true);
+    // Selecting a subgraph always clears all other selections.
+    state.selectedNodes.clear();
+    state.selectedLinks.clear();
     state.setSelectedSubgraph(subgraph);
     updateEditorPanels();
     renderD3();
