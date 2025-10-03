@@ -1,7 +1,9 @@
 import * as state from './state.js';
 import { renderD3 } from './d3-renderer.js';
 import { generateUniqueId } from './utils.js';
-import { updateAll, updateMermaidCode } from './main.js';
+// NOTE: avoid importing updateAll/updateMermaidCode from './main.js' to prevent a circular
+// module dependency. Those functions are attached to window by main.js and accessed here
+// as window.updateAll() / window.updateMermaidCode().
 
 export function initializeEventListeners() {
     document.getElementById('add-node-btn').addEventListener('click', addNewNode);
@@ -12,7 +14,7 @@ export function initializeEventListeners() {
         if (state.selectedNodes.size === 1) {
             const selectedNode = state.selectedNodes.values().next().value;
             selectedNode.text = e.target.value;
-            updateAll();
+            if (typeof window.updateAll === 'function') window.updateAll();
         }
     });
 
@@ -20,7 +22,7 @@ export function initializeEventListeners() {
         if (state.selectedNodes.size === 1) {
             const selectedNode = state.selectedNodes.values().next().value;
             selectedNode.subgraphId = e.target.value || null;
-            updateAll();
+            if (typeof window.updateAll === 'function') window.updateAll();
         }
     });
 
@@ -30,7 +32,7 @@ export function initializeEventListeners() {
         if (state.selectedLinks.size === 1) {
             const selectedLink = state.selectedLinks.values().next().value;
             selectedLink.label = e.target.value;
-            updateAll();
+            if (typeof window.updateAll === 'function') window.updateAll();
         }
     });
 
@@ -39,13 +41,15 @@ export function initializeEventListeners() {
     document.getElementById('subgraph-title').addEventListener('input', (e) => {
         if (state.selectedSubgraph) {
             state.selectedSubgraph.title = e.target.value;
-            updateAll();
+            if (typeof window.updateAll === 'function') window.updateAll();
         }
     });
 
     document.getElementById('delete-subgraph-btn').addEventListener('click', deleteSelected);
 
-    document.getElementById('comments-input').addEventListener('input', updateMermaidCode);
+    document.getElementById('comments-input').addEventListener('input', () => {
+        if (typeof window.updateMermaidCode === 'function') window.updateMermaidCode();
+    });
 
     document.getElementById('copy-code-btn').addEventListener('click', () => {
         const codeTextArea = document.getElementById('mermaid-code');

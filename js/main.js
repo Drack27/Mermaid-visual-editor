@@ -76,3 +76,7 @@ export function updateMermaidCode() {
     });
     codeTextArea.value = code;
 }
+
+// Expose shared API to other modules to avoid circular imports
+window.updateAll = updateAll;
+window.updateMermaidCode = updateMermaidCode;
