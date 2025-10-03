@@ -1,0 +1,25 @@
+{
+  "name": "app",
+  "version": "1.0.0",
+  "description": "The Mermaid Visual Editor is a user-friendly, web-based tool for creating and editing Mermaid flowcharts. It provides a drag-and-drop interface that allows users to build diagrams visually, without needing to write Mermaid code manually. The editor generates the corresponding Mermaid syntax in real-time, which can be copied and used in any Mermaid-supported platform.",
+  "main": "editor.js",
+  "scripts": {
+    "start": "npx live-server EditorMain.html --port=3000",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Drack27/Mermaid-visual-editor.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/Drack27/Mermaid-visual-editor/issues"
+  },
+  "homepage": "https://github.com/Drack27/Mermaid-visual-editor#readme",
+  "devDependencies": {
+    "live-server": "^1.2.2"
+  }
+}
