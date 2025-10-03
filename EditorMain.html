@@ -22,24 +22,6 @@
             background-image: radial-gradient(#d1d5db 1px, transparent 0);
             background-size: 20px 20px;
         }
-        .resize-handle {
-            fill: #3b82f6;
-            stroke: white;
-            stroke-width: 2px;
-        }
-        .node-text-wrapper {
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 100%;
-            text-align: center;
-            word-break: break-word;
-            pointer-events: none;
-            font-size: 14px;
-            color: #1f2937;
-            padding: 4px;
-            box-sizing: border-box;
-        }
     </style>
 </head>
 <body class="bg-gray-100 text-gray-800">
@@ -66,6 +48,11 @@
                             Create Link
                         </button>
                     </div>
+                    <div class="mt-2">
+                        <button id="add-subgraph-btn" class="w-full bg-purple-500 hover:bg-purple-600 text-white font-bold py-2 px-4 rounded-lg transition-colors">
+                            Add Subgraph
+                        </button>
+                    </div>
                 </div>
 
                 <!-- Node Editor (hidden by default) -->
@@ -80,12 +67,60 @@
                             <label for="node-id" class="block text-sm font-medium text-gray-700">Node ID (Unique)</label>
                             <input type="text" id="node-id" readonly class="mt-1 block w-full rounded-md border-gray-300 shadow-sm bg-gray-100 sm:text-sm">
                         </div>
+                        <div>
+                            <label for="node-subgraph" class="block text-sm font-medium text-gray-700">Subgraph</label>
+                            <select id="node-subgraph" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
+                                <!-- Options will be populated by JS -->
+                            </select>
+                        </div>
                     </div>
                     <div class="mt-4">
                          <button id="delete-node-btn" class="w-full bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded-lg transition-colors">
                             Delete Node
                         </button>
                     </div>
+                </div>
+
+                <!-- Link Editor (hidden by default) -->
+                <div id="link-editor" class="mb-6 hidden">
+                    <h2 class="text-lg font-semibold mb-3 border-b pb-2">Edit Selected Link</h2>
+                    <div class="space-y-3">
+                        <div>
+                            <label for="link-label" class="block text-sm font-medium text-gray-700">Link Label</label>
+                            <input type="text" id="link-label" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
+                        </div>
+                    </div>
+                    <div class="mt-4">
+                         <button id="delete-link-btn" class="w-full bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded-lg transition-colors">
+                            Delete Link
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Subgraph Editor (hidden by default) -->
+                <div id="subgraph-editor" class="mb-6 hidden">
+                    <h2 class="text-lg font-semibold mb-3 border-b pb-2">Edit Selected Subgraph</h2>
+                    <div class="space-y-3">
+                        <div>
+                            <label for="subgraph-title" class="block text-sm font-medium text-gray-700">Subgraph Title</label>
+                            <input type="text" id="subgraph-title" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
+                        </div>
+                        <div>
+                            <label for="subgraph-id" class="block text-sm font-medium text-gray-700">Subgraph ID (Unique)</label>
+                            <input type="text" id="subgraph-id" readonly class="mt-1 block w-full rounded-md border-gray-300 shadow-sm bg-gray-100 sm:text-sm">
+                        </div>
+                    </div>
+                    <div class="mt-4">
+                        <button id="delete-subgraph-btn" class="w-full bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded-lg transition-colors">
+                            Delete Subgraph
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Comments -->
+                <div class="mb-6">
+                    <h2 class="text-lg font-semibold mb-3 border-b pb-2">Comments</h2>
+                    <textarea id="comments-input" class="w-full h-24 p-2 border border-gray-300 rounded-md bg-white font-sans text-sm" placeholder="Add comments here..."></textarea>
                 </div>
 
                 <!-- Mermaid Code Output -->
@@ -105,6 +140,502 @@
         </div>
     </div>
 
-    <script type="module" src="editor.js"></script>
+    <script type="module">
+        document.addEventListener('DOMContentLoaded', () => {
+        // --- State Management ---
+        let nodes = [
+            { id: 'A', text: 'Start Here', x: 150, y: 100, width: 120, height: 60 },
+            { id: 'B', text: 'Go Left or Right?', x: 150, y: 250, width: 150, height: 60 },
+        ];
+        let links = [
+            { source: 'A', target: 'B', label: 'Connection' }
+        ];
+        let subgraphs = [];
+        let selectedNode = null;
+        let selectedLink = null;
+        let selectedSubgraph = null;
+        let isLinking = false;
+        let linkStartNode = null;
+
+        // --- D3 Setup ---
+        const svg = d3.select("#visual-editor-svg");
+        const width = svg.node().getBoundingClientRect().width;
+        const height = svg.node().getBoundingClientRect().height;
+
+        const subgraphGroup = svg.append("g").attr("class", "subgraphs");
+        const linkGroup = svg.append("g").attr("class", "links");
+        const nodeGroup = svg.append("g").attr("class", "nodes");
+
+        svg.append("defs").append("marker")
+            .attr("id", "arrowhead")
+            .attr("viewBox", "-0 -5 10 10")
+            .attr("refX", 19)
+            .attr("refY", 0)
+            .attr("orient", "auto")
+            .attr("markerWidth", 8)
+            .attr("markerHeight", 8)
+            .attr("xoverflow", "visible")
+            .append("svg:path")
+            .attr("d", "M 0,-5 L 10 ,0 L 0,5")
+            .attr("class", "arrowhead");
+
+        // --- Core Functions ---
+        function updateAll() {
+            renderD3();
+            updateMermaidCode();
+        }
+
+        function generateUniqueId() {
+            return `node_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
+        }
+
+        function updateMermaidCode() {
+            const codeTextArea = document.getElementById('mermaid-code');
+            let code = "";
+
+            // Add comments
+            const comments = document.getElementById('comments-input').value.trim();
+            if (comments) {
+                comments.split('\n').forEach(line => {
+                    code += `%% ${line}\n`;
+                });
+            }
+
+            code += "graph TD\n";
+
+            const nodesBySubgraph = nodes.reduce((acc, node) => {
+                const subgraphId = node.subgraphId || 'root';
+                if (!acc[subgraphId]) {
+                    acc[subgraphId] = [];
+                }
+                acc[subgraphId].push(node);
+                return acc;
+            }, {});
+
+            // Render subgraphs
+            subgraphs.forEach(sg => {
+                code += `    subgraph ${sg.id} ["${sg.title}"]\n`;
+                const sgNodes = nodesBySubgraph[sg.id] || [];
+                sgNodes.forEach(node => {
+                    const nodeText = node.text.replace(/"/g, '#quot;');
+                    code += `        ${node.id}["${nodeText}"]\n`;
+                });
+                code += `    end\n`;
+            });
+
+            // Render nodes not in any subgraph
+            const orphanNodes = nodesBySubgraph['root'] || [];
+            orphanNodes.forEach(node => {
+                const nodeText = node.text.replace(/"/g, '#quot;');
+                code += `    ${node.id}["${nodeText}"]\n`;
+            });
+
+            // Render links
+            links.forEach(link => {
+                if (link.label) {
+                    const linkText = link.label.replace(/"/g, '#quot;');
+                    code += `    ${link.source} -- "${linkText}" --> ${link.target}\n`;
+                } else {
+                    code += `    ${link.source} --> ${link.target}\n`;
+                }
+            });
+            codeTextArea.value = code;
+        }
+
+        // --- D3 Rendering ---
+        function updateLinkPaths() {
+            const linkSelection = linkGroup.selectAll("path.link")
+                .data(links, d => `${d.source}-${d.target}`)
+                .join("path")
+                .attr("class", d => `link ${selectedLink === d ? 'selected' : ''}`)
+                .attr("marker-end", "url(#arrowhead)")
+                .on('click', (event, d) => {
+                    event.stopPropagation();
+                    selectLink(d);
+                });
+
+            linkSelection.attr("d", d => {
+                const sourceNode = nodes.find(n => n.id === d.source);
+                const targetNode = nodes.find(n => n.id === d.target);
+                if (!sourceNode || !targetNode) return "";
+
+                const dx = targetNode.x - sourceNode.x;
+                const dy = targetNode.y - sourceNode.y;
+                const gamma = Math.atan2(dy, dx);
+
+                const getIntersection = (node, angle) => {
+                    const w = node.width / 2;
+                    const h = node.height / 2;
+                    const tan_gamma = Math.tan(angle);
+                    let x, y;
+                    if (Math.abs(h * Math.cos(angle)) > Math.abs(w * Math.sin(angle))) {
+                        x = w * (Math.cos(angle) > 0 ? 1 : -1) + node.x;
+                        y = w * (Math.cos(angle) > 0 ? 1 : -1) * tan_gamma + node.y;
+                    } else {
+                        y = h * (Math.sin(angle) > 0 ? 1 : -1) + node.y;
+                        x = h * (Math.sin(angle) > 0 ? 1 : -1) / tan_gamma + node.x;
+                    }
+                    return { x, y };
+                };
+
+                const sourcePoint = getIntersection(sourceNode, gamma);
+                const targetPoint = getIntersection(targetNode, gamma + Math.PI);
+
+                return `M${sourcePoint.x},${sourcePoint.y}L${targetPoint.x},${targetPoint.y}`;
+            });
+        }
+
+        function updateLinkLabels() {
+             linkGroup.selectAll("text.link-label")
+                .data(links, d => `${d.source}-${d.target}`)
+                .join("text")
+                .attr("class", "link-label")
+                .attr("text-anchor", "middle")
+                .attr("dy", "-4")
+                .text(d => d.label)
+                .attr("x", d => {
+                    const sourceNode = nodes.find(n => n.id === d.source);
+                    const targetNode = nodes.find(n => n.id === d.target);
+                    if (!sourceNode || !targetNode) return 0;
+                    return (sourceNode.x + targetNode.x) / 2;
+                })
+                .attr("y", d => {
+                    const sourceNode = nodes.find(n => n.id === d.source);
+                    const targetNode = nodes.find(n => n.id === d.target);
+                    if (!sourceNode || !targetNode) return 0;
+                    return (sourceNode.y + targetNode.y) / 2;
+                });
+        }
+
+        function updateSubgraphRects() {
+            const subgraphSelection = subgraphGroup.selectAll("g.subgraph").data(subgraphs, d => d.id);
+            subgraphSelection.each(function(d) {
+                const childNodes = nodes.filter(n => n.subgraphId === d.id);
+                if (childNodes.length === 0) {
+                    d3.select(this).select('rect').attr('width', 200).attr('height', 150);
+                     d3.select(this).attr('transform', `translate(10, 10)`);
+                    return;
+                };
+
+                let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+                childNodes.forEach(n => {
+                    minX = Math.min(minX, n.x - n.width / 2);
+                    minY = Math.min(minY, n.y - n.height / 2);
+                    maxX = Math.max(maxX, n.x + n.width / 2);
+                    maxY = Math.max(maxY, n.y + n.height / 2);
+                });
+
+                const padding = 20;
+                const titleHeight = 30;
+                const rectX = minX - padding;
+                const rectY = minY - padding - titleHeight;
+                const rectWidth = (maxX - minX) + (2 * padding);
+                const rectHeight = (maxY - minY) + (2 * padding) + titleHeight;
+
+                d3.select(this).attr('transform', `translate(${rectX}, ${rectY})`);
+                d3.select(this).select('rect').attr('width', rectWidth).attr('height', rectHeight);
+                d3.select(this).select('text').attr('x', rectWidth / 2).attr('y', titleHeight / 2);
+            });
+        }
+
+        function renderD3() {
+            // Render subgraphs first so they are in the background
+            const subgraphSelection = subgraphGroup.selectAll("g.subgraph").data(subgraphs, d => d.id);
+            subgraphSelection.exit().remove();
+
+            const subgraphEnter = subgraphSelection.enter().append("g")
+                .attr("class", "subgraph")
+                .on('click', (event, d) => {
+                    event.stopPropagation();
+                    selectSubgraph(d);
+                });
+            subgraphEnter.append("rect");
+            subgraphEnter.append("text").attr("text-anchor", "middle");
+
+            subgraphEnter.merge(subgraphSelection)
+                .attr("class", d => `subgraph ${selectedSubgraph === d ? 'selected' : ''}`)
+                .select("text").text(d => d.title);
+
+            // Render nodes
+            const nodeSelection = nodeGroup.selectAll("g.node").data(nodes, d => d.id);
+            nodeSelection.exit().remove();
+
+            const nodeEnter = nodeSelection.enter().append("g").attr("class", "node");
+            nodeEnter.append("rect");
+            nodeEnter.append("text").attr("dy", "0.35em").attr("text-anchor", "middle");
+
+            const allNodes = nodeEnter.merge(nodeSelection);
+
+            allNodes
+                .attr("transform", d => `translate(${d.x - d.width/2},${d.y - d.height/2})`)
+                .attr("class", d => {
+                    let classes = 'node';
+                    if (d === selectedNode) classes += ' selected';
+                    if (linkStartNode && d.id === linkStartNode.id) classes += ' linking-source';
+                    return classes;
+                });
+
+            allNodes.select("rect")
+                .attr("width", d => d.width)
+                .attr("height", d => d.height);
+
+            allNodes.select("text")
+                .attr("x", d => d.width / 2)
+                .attr("y", d => d.height / 2)
+                .text(d => d.text);
+
+            allNodes
+                .on("click", (event, d) => {
+                    event.stopPropagation();
+                    if (isLinking) {
+                        handleLinking(d);
+                    } else {
+                        selectNode(d);
+                    }
+                })
+                .call(d3.drag()
+                    .on("start", dragstarted)
+                    .on("drag", dragged)
+                    .on("end", dragended));
+
+            updateLinkPaths();
+            updateLinkLabels();
+            updateSubgraphRects();
+        }
+
+        // --- Drag Handling ---
+        function dragstarted(event, d) {
+            d3.select(this).raise().classed("active", true);
+        }
+
+        function dragged(event, d) {
+            d.x = event.x;
+            d.y = event.y;
+            d3.select(this).attr("transform", `translate(${d.x - d.width/2},${d.y - d.height/2})`);
+            updateLinkPaths();
+            updateLinkLabels();
+            if (d.subgraphId) {
+                updateSubgraphRects();
+            }
+        }
+
+        function dragended(event, d) {
+            d3.select(this).classed("active", false);
+            updateAll();
+        }
+
+        // --- Data Generation ---
+        function generateUniqueId(prefix = 'node') {
+            return `${prefix}_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
+        }
+
+        // --- Selection & Management ---
+        function selectNode(node) {
+            selectedNode = node;
+            selectedLink = null;
+            selectedSubgraph = null;
+
+            document.getElementById('node-editor').classList.remove('hidden');
+            document.getElementById('link-editor').classList.add('hidden');
+            document.getElementById('subgraph-editor').classList.add('hidden');
+
+            document.getElementById('node-text').value = node.text;
+            document.getElementById('node-id').value = node.id;
+
+            // Populate subgraph dropdown
+            const subgraphSelect = document.getElementById('node-subgraph');
+            subgraphSelect.innerHTML = '<option value="">None</option>'; // Clear existing
+            subgraphs.forEach(sg => {
+                const option = document.createElement('option');
+                option.value = sg.id;
+                option.textContent = sg.title;
+                subgraphSelect.appendChild(option);
+            });
+            subgraphSelect.value = node.subgraphId || '';
+
+            updateAll();
+        }
+
+        function selectLink(link) {
+            selectedLink = link;
+            selectedNode = null;
+            selectedSubgraph = null;
+            document.getElementById('link-editor').classList.remove('hidden');
+            document.getElementById('node-editor').classList.add('hidden');
+            document.getElementById('subgraph-editor').classList.add('hidden');
+            document.getElementById('link-label').value = link.label;
+            updateAll();
+        }
+
+        function selectSubgraph(subgraph) {
+            selectedSubgraph = subgraph;
+            selectedNode = null;
+            selectedLink = null;
+            document.getElementById('subgraph-editor').classList.remove('hidden');
+            document.getElementById('node-editor').classList.add('hidden');
+            document.getElementById('link-editor').classList.add('hidden');
+            document.getElementById('subgraph-title').value = subgraph.title;
+            document.getElementById('subgraph-id').value = subgraph.id;
+            updateAll();
+        }
+
+        function deselectAll() {
+            selectedNode = null;
+            selectedLink = null;
+            selectedSubgraph = null;
+            document.getElementById('node-editor').classList.add('hidden');
+            document.getElementById('link-editor').classList.add('hidden');
+            document.getElementById('subgraph-editor').classList.add('hidden');
+
+            isLinking = false;
+            linkStartNode = null;
+            document.getElementById('create-link-btn').textContent = 'Create Link';
+            document.getElementById('create-link-btn').classList.remove('bg-yellow-500', 'hover:bg-yellow-600');
+            document.getElementById('create-link-btn').classList.add('bg-green-500', 'hover:bg-green-600');
+            svg.classed('linking-cursor', false);
+            updateAll();
+        }
+
+        function handleLinking(targetNode) {
+            if (!linkStartNode) {
+                linkStartNode = targetNode;
+                document.getElementById('create-link-btn').textContent = '...Select Target Node';
+                updateAll();
+            } else {
+                if (linkStartNode.id !== targetNode.id) {
+                    const linkExists = links.some(l => (l.source === linkStartNode.id && l.target === targetNode.id));
+                    if (!linkExists) {
+                        links.push({ source: linkStartNode.id, target: targetNode.id, label: '' });
+                    }
+                }
+                deselectAll();
+            }
+        }
+
+        // --- Event Listeners ---
+        document.getElementById('add-node-btn').addEventListener('click', () => {
+            const newNode = {
+                id: generateUniqueId('node'),
+                text: 'New Node',
+                x: Math.random() * (width - 200) + 100,
+                y: Math.random() * (height - 100) + 50,
+                width: 120,
+                height: 60,
+                subgraphId: null
+            };
+            nodes.push(newNode);
+            selectNode(newNode);
+        });
+
+        document.getElementById('add-subgraph-btn').addEventListener('click', () => {
+            const newSubgraph = {
+                id: generateUniqueId('sg'),
+                title: 'New Subgraph'
+            };
+            subgraphs.push(newSubgraph);
+            selectSubgraph(newSubgraph);
+        });
+
+        document.getElementById('create-link-btn').addEventListener('click', () => {
+            isLinking = !isLinking;
+            if (isLinking) {
+                deselectAll();
+                isLinking = true; // deselectAll sets it to false
+                linkStartNode = null;
+                document.getElementById('create-link-btn').textContent = 'Cancel Linking';
+                document.getElementById('create-link-btn').classList.remove('bg-green-500', 'hover:bg-green-600');
+                document.getElementById('create-link-btn').classList.add('bg-yellow-500', 'hover:bg-yellow-600');
+                svg.classed('linking-cursor', true);
+                updateAll();
+            } else {
+                deselectAll();
+            }
+        });
+
+        document.getElementById('node-text').addEventListener('input', (e) => {
+            if (selectedNode) {
+                selectedNode.text = e.target.value;
+                updateAll();
+            }
+        });
+
+        document.getElementById('node-subgraph').addEventListener('change', (e) => {
+            if (selectedNode) {
+                selectedNode.subgraphId = e.target.value || null;
+                updateAll();
+            }
+        });
+
+        document.getElementById('delete-node-btn').addEventListener('click', () => {
+            if (selectedNode) {
+                nodes = nodes.filter(n => n.id !== selectedNode.id);
+                links = links.filter(l => l.source !== selectedNode.id && l.target !== selectedNode.id);
+                deselectAll();
+            }
+        });
+
+        document.getElementById('link-label').addEventListener('input', (e) => {
+            if (selectedLink) {
+                selectedLink.label = e.target.value;
+                updateAll();
+            }
+        });
+
+        document.getElementById('delete-link-btn').addEventListener('click', () => {
+            if (selectedLink) {
+                links = links.filter(l => l !== selectedLink);
+                deselectAll();
+            }
+        });
+
+        document.getElementById('subgraph-title').addEventListener('input', (e) => {
+            if (selectedSubgraph) {
+                selectedSubgraph.title = e.target.value;
+                updateAll();
+            }
+        });
+
+        document.getElementById('delete-subgraph-btn').addEventListener('click', () => {
+            if (selectedSubgraph) {
+                // Remove subgraph and unset subgraphId on its nodes
+                nodes.forEach(n => {
+                    if (n.subgraphId === selectedSubgraph.id) {
+                        n.subgraphId = null;
+                    }
+                });
+                subgraphs = subgraphs.filter(sg => sg.id !== selectedSubgraph.id);
+                deselectAll();
+            }
+        });
+
+        document.getElementById('comments-input').addEventListener('input', () => {
+            updateAll();
+        });
+
+        document.getElementById('copy-code-btn').addEventListener('click', () => {
+            const codeTextArea = document.getElementById('mermaid-code');
+            codeTextArea.select();
+            document.execCommand('copy');
+        });
+
+        svg.on('click', () => {
+            if (!isLinking) {
+                deselectAll();
+            }
+        });
+
+        // --- Initial Load ---
+        updateAll();
+
+        // Expose functions and data for testing
+        window.selectNode = selectNode;
+        window.selectLink = selectLink;
+        window.deselectAll = deselectAll;
+        window.nodes = nodes;
+        window.links = links;
+        window.subgraphs = subgraphs;
+        window.updateAll = updateAll;
+        });
+    </script>
 </body>
 </html>
